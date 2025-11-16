@@ -1,15 +1,23 @@
 # Simple Go API
 
+[![CI](https://github.com/S1933/simple-go-api/actions/workflows/ci.yml/badge.svg)](https://github.com/S1933/simple-go-api/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/S1933/simple-go-api)](https://goreportcard.com/report/github.com/S1933/simple-go-api)
+
 A lightweight REST API built with Go's standard library for managing client profiles.
 
 ## Project Structure
 
 ```
 simple-go-api/
-├── main.go         # Application entry point and server setup
-├── handlers.go     # HTTP request handlers and business logic
-├── database.go     # Data models and in-memory database
-└── README.md       # This file
+├── .github/
+│   └── workflows/
+│       └── ci.yml   # GitHub Actions CI/CD pipeline
+├── main.go          # Application entry point and server setup
+├── handlers.go      # HTTP request handlers and business logic
+├── handlers_test.go # Comprehensive test suite
+├── database.go      # Data models and in-memory database
+├── go.mod           # Go module definition
+└── README.md        # This file
 ```
 
 ## Features
@@ -117,13 +125,18 @@ curl -X DELETE "http://localhost:8080/user/profile?clientId=user1"
    cd /path/to/simple-go-api
    ```
 
-2. **Build the application:**
+2. **Initialize Go module (if not already done):**
+   ```bash
+   go mod init simple-go-api
+   ```
+
+3. **Build the application:**
    ```bash
    go build *.go
    ```
    This creates a binary named `database`.
 
-3. **Run the server:**
+4. **Run the server:**
    ```bash
    ./database
    ```
@@ -133,12 +146,67 @@ curl -X DELETE "http://localhost:8080/user/profile?clientId=user1"
    go run *.go
    ```
 
-4. **The server will start on port 8080:**
+5. **The server will start on port 8080:**
    ```
    Server starting on :8080
    ```
 
-### Initial Data
+### Running Tests
+
+The project includes comprehensive unit tests with **93.6% code coverage**.
+
+**Run all tests:**
+```bash
+go test
+```
+
+**Run tests with verbose output:**
+```bash
+go test -v
+```
+
+**Run tests with coverage:**
+```bash
+go test -cover
+```
+
+**Generate detailed coverage report:**
+```bash
+go test -coverprofile=coverage.out
+go tool cover -html=coverage.out
+```
+
+### Test Coverage
+
+The test suite includes:
+- ✅ **15 test cases** covering all endpoints
+- ✅ Success scenarios for GET, PATCH, DELETE
+- ✅ Error handling (404, 400, 403, 405)
+- ✅ Edge cases (missing parameters, invalid JSON)
+- ✅ Partial update validation
+- ✅ HTTP method routing
+- ✅ Content-Type headers
+- ✅ Token immutability
+- ✅ Database state verification
+
+## CI/CD
+
+The project uses GitHub Actions for continuous integration:
+
+### Workflows
+
+**CI Pipeline** (`.github/workflows/ci.yml`)
+- ✅ **Test Job**: Runs tests with race detection and generates coverage reports
+- ✅ **Build Job**: Compiles the application and uploads artifacts
+- ✅ **Lint Job**: Runs golangci-lint for code quality checks
+
+**Triggers:**
+- Push to `main` branch
+- Pull requests to `main` branch
+
+**View CI Status:**
+- Check the [Actions tab](https://github.com/S1933/simple-go-api/actions) in GitHub
+- CI badge at the top of this README shows current status### Initial Data
 
 The application comes pre-populated with two client profiles:
 
@@ -164,6 +232,12 @@ The application comes pre-populated with two client profiles:
 - **GetClientProfile**: Retrieves client data by ID
 - **UpdateClientProfile**: Updates client name/email with partial update support
 - **DeleteClientProfile**: Removes client from database
+
+#### `handlers_test.go`
+- **15 comprehensive test cases** with 93.6% code coverage
+- Tests all success and error scenarios
+- Uses `httptest` for HTTP handler testing
+- Includes database reset helper for test isolation
 
 #### `database.go`
 - **ClientProfile**: Struct defining the data model (Email, Id, Name, Token)
@@ -217,8 +291,8 @@ pkill database
 - Create separate routes for each operation
 - Add logging and metrics
 - Implement proper concurrency handling with mutexes
-- Add unit tests
-- Add pagination for listing all clients
+- Add integration tests and benchmarks
+- Implement pagination for listing all clients
 
 ## License
 
