@@ -71,7 +71,6 @@ func UpdateClientProfile(w http.ResponseWriter, r *http.Request) {
 	database[clientId] = clientProfile
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(clientProfile); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
