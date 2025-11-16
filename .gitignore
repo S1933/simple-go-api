@@ -19,6 +19,7 @@ go.work
 database
 bin/
 dist/
+simple-go-api
 
 # IDE specific files
 .vscode/

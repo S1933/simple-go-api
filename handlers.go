@@ -33,7 +33,10 @@ func GetClientProfile(w http.ResponseWriter, r *http.Request) {
 		Id:    clientProfile.Id,
 		Name:  clientProfile.Name,
 	}
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func UpdateClientProfile(w http.ResponseWriter, r *http.Request) {
@@ -68,8 +71,10 @@ func UpdateClientProfile(w http.ResponseWriter, r *http.Request) {
 	database[clientId] = clientProfile
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(clientProfile)
+	if err := json.NewEncoder(w).Encode(clientProfile); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func DeleteClientProfile(w http.ResponseWriter, r *http.Request) {
