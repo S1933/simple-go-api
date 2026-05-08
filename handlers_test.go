@@ -336,3 +336,209 @@ func TestUpdateClientProfile_ContentType(t *testing.T) {
 		t.Errorf("Expected Content-Type 'application/json', got '%s'", contentType)
 	}
 }
+
+type listResponse struct {
+	Clients []ClientListItem `json:"clients"`
+	Page    int              `json:"page"`
+	PerPage int              `json:"per_page"`
+	Total   int              `json:"total"`
+	Pages   int              `json:"total_pages"`
+}
+
+func decodeListResponse(t *testing.T, body []byte) listResponse {
+	t.Helper()
+	var response listResponse
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&response); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	return response
+}
+
+func TestHandleListClientProfiles_MethodRouting(t *testing.T) {
+	resetDatabase()
+
+	tests := []struct {
+		method       string
+		expectedCode int
+		description  string
+	}{
+		{http.MethodGet, http.StatusOK, "GET should succeed"},
+		{http.MethodPost, http.StatusMethodNotAllowed, "POST should not be allowed"},
+		{http.MethodPut, http.StatusMethodNotAllowed, "PUT should not be allowed"},
+		{http.MethodPatch, http.StatusMethodNotAllowed, "PATCH should not be allowed"},
+		{http.MethodDelete, http.StatusMethodNotAllowed, "DELETE should not be allowed"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, "/user/list", nil)
+			w := httptest.NewRecorder()
+
+			handleListClientProfiles(w, req)
+
+			if w.Code != tt.expectedCode {
+				t.Errorf("Expected status %d, got %d", tt.expectedCode, w.Code)
+			}
+		})
+	}
+}
+
+func TestListClientProfiles_ReturnsAllClients(t *testing.T) {
+	resetDatabase()
+
+	req := httptest.NewRequest(http.MethodGet, "/user/list", nil)
+	w := httptest.NewRecorder()
+
+	ListClientProfiles(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	response := decodeListResponse(t, w.Body.Bytes())
+
+	if len(response.Clients) != 2 {
+		t.Errorf("Expected 2 clients, got %d", len(response.Clients))
+	}
+	if response.Total != 2 {
+		t.Errorf("Expected total 2, got %d", response.Total)
+	}
+	if response.Page != 1 {
+		t.Errorf("Expected page 1, got %d", response.Page)
+	}
+}
+
+func TestListClientProfiles_TokenExcluded(t *testing.T) {
+	resetDatabase()
+
+	req := httptest.NewRequest(http.MethodGet, "/user/list", nil)
+	w := httptest.NewRecorder()
+
+	ListClientProfiles(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	if bytes.Contains(w.Body.Bytes(), []byte("Token")) {
+		t.Error("Response should not contain Token field")
+	}
+}
+
+func TestListClientProfiles_PartialLastPage(t *testing.T) {
+	resetDatabase()
+	database["user3"] = ClientProfile{
+		Email: "email3@gmail.com",
+		Id:    "user3",
+		Name:  "User Three",
+		Token: "789",
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/user/list?page=2&per_page=2", nil)
+	w := httptest.NewRecorder()
+
+	ListClientProfiles(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	response := decodeListResponse(t, w.Body.Bytes())
+
+	if len(response.Clients) != 1 {
+		t.Errorf("Expected 1 client on partial last page, got %d", len(response.Clients))
+	}
+	if response.Total != 3 {
+		t.Errorf("Expected total 3, got %d", response.Total)
+	}
+	if response.Pages != 2 {
+		t.Errorf("Expected total_pages 2, got %d", response.Pages)
+	}
+}
+
+func TestListClientProfiles_InvalidParams(t *testing.T) {
+	resetDatabase()
+
+	tests := []struct {
+		name   string
+		query  string
+		reason string
+	}{
+		{"non-numeric page", "page=abc", "page must be a number"},
+		{"negative page", "page=-1", "page cannot be negative"},
+		{"non-numeric per_page", "per_page=xyz", "per_page must be a number"},
+		{"negative per_page", "per_page=-5", "per_page cannot be negative"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/user/list?"+tt.query, nil)
+			w := httptest.NewRecorder()
+
+			ListClientProfiles(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("Expected 400, got %d — %s", w.Code, tt.reason)
+			}
+		})
+	}
+}
+
+func TestListClientProfiles_PageExceedsTotal(t *testing.T) {
+	resetDatabase()
+
+	req := httptest.NewRequest(http.MethodGet, "/user/list?page=99&per_page=10", nil)
+	w := httptest.NewRecorder()
+
+	ListClientProfiles(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	response := decodeListResponse(t, w.Body.Bytes())
+
+	if len(response.Clients) != 0 {
+		t.Errorf("Expected 0 clients, got %d", len(response.Clients))
+	}
+	if response.Total != 2 {
+		t.Errorf("Expected total 2, got %d", response.Total)
+	}
+	if response.Pages != 1 {
+		t.Errorf("Expected total_pages 1, got %d", response.Pages)
+	}
+	if response.Page != 99 {
+		t.Errorf("Expected page 99, got %d", response.Page)
+	}
+}
+
+func TestListClientProfiles_Pagination(t *testing.T) {
+	resetDatabase()
+
+	req := httptest.NewRequest(http.MethodGet, "/user/list?page=2&per_page=1", nil)
+	w := httptest.NewRecorder()
+
+	ListClientProfiles(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	response := decodeListResponse(t, w.Body.Bytes())
+
+	if len(response.Clients) != 1 {
+		t.Errorf("Expected 1 client, got %d", len(response.Clients))
+	}
+	if response.Page != 2 {
+		t.Errorf("Expected page 2, got %d", response.Page)
+	}
+	if response.PerPage != 1 {
+		t.Errorf("Expected per_page 1, got %d", response.PerPage)
+	}
+	if response.Total != 2 {
+		t.Errorf("Expected total 2, got %d", response.Total)
+	}
+	if response.Pages != 2 {
+		t.Errorf("Expected total_pages 2, got %d", response.Pages)
+	}
+}

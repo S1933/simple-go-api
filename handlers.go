@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
+	"strconv"
 )
 
 func handleClientProfile(w http.ResponseWriter, r *http.Request) {
@@ -87,4 +89,76 @@ func DeleteClientProfile(w http.ResponseWriter, r *http.Request) {
 
 	delete(database, clientId)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func parsePageParam(s string, defaultVal int) (int, error) {
+	if s == "" {
+		return defaultVal, nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 1 {
+		return 0, strconv.ErrSyntax
+	}
+	return v, nil
+}
+
+func handleListClientProfiles(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		ListClientProfiles(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func ListClientProfiles(w http.ResponseWriter, r *http.Request) {
+	page, err := parsePageParam(r.URL.Query().Get("page"), 1)
+	if err != nil {
+		http.Error(w, "invalid page", http.StatusBadRequest)
+		return
+	}
+	perPage, err := parsePageParam(r.URL.Query().Get("per_page"), 10)
+	if err != nil {
+		http.Error(w, "invalid per_page", http.StatusBadRequest)
+		return
+	}
+
+	all := make([]ClientListItem, 0, len(database))
+	for _, profile := range database {
+		all = append(all, ClientListItem{
+			Email: profile.Email,
+			Id:    profile.Id,
+			Name:  profile.Name,
+		})
+	}
+
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].Id < all[j].Id
+	})
+
+	total := len(all)
+	totalPages := (total + perPage - 1) / perPage
+	if totalPages < 1 {
+		totalPages = 1
+	}
+
+	start := (page - 1) * perPage
+	if start >= total {
+		start = total
+	}
+	end := start + perPage
+	if end > total {
+		end = total
+	}
+
+	response := ClientListResponse{
+		Clients:    all[start:end],
+		Page:       page,
+		PerPage:    perPage,
+		Total:      total,
+		TotalPages: totalPages,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }

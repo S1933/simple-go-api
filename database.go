@@ -7,6 +7,20 @@ type ClientProfile struct {
 	Token string
 }
 
+type ClientListItem struct {
+	Email string `json:"Email"`
+	Id    string `json:"Id"`
+	Name  string `json:"Name"`
+}
+
+type ClientListResponse struct {
+	Clients    []ClientListItem `json:"clients"`
+	Page       int              `json:"page"`
+	PerPage    int              `json:"per_page"`
+	Total      int              `json:"total"`
+	TotalPages int              `json:"total_pages"`
+}
+
 var database = map[string]ClientProfile{
 	"user1": {
 		Email: "email1@gmail.com",
