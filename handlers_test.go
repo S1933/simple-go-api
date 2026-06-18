@@ -137,7 +137,9 @@ func TestUpdateClientProfile_PartialUpdate(t *testing.T) {
 	}
 
 	var response ClientProfile
-	json.NewDecoder(w.Body).Decode(&response)
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
 
 	if response.Name != "Only Name Changed" {
 		t.Errorf("Expected name 'Only Name Changed', got '%s'", response.Name)
